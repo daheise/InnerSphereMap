@@ -50,7 +50,7 @@ def get_system_owner(sysdef):
     """Return an array of planet_* tags"""
     return sysdef['Tags']['items']
 
-def get_system_collections(itemCollections, system_tags, owner = None):
+def get_system_collections(itemCollections, system_tags, system_desc, owner = None):
     """
     Determine appropriate shop item collections.
     
@@ -58,28 +58,45 @@ def get_system_collections(itemCollections, system_tags, owner = None):
     """
     system_collections = []
     for system_tag in system_tags:
-        #if "planet_pop_none" in system_tags:
-        #    continue
+        # Split the item tags by underscore.
         system_parts = system_tag.split('_')
+        # If a particular part is about 'none' then we don't care about it
         if 'none' in system_parts:
             continue
         for collection in itemCollections:
-            collection_parts = collection.split('_')
+            # Split the item collection possibilities by underscore
+            collection_parts = list(set(collection.split('_')))
+            # If it's not a shop-type collection, we move along
             if (('shop' not in collection_parts) and
                ('major' not in collection_parts) and
                ('minor' not in collection_parts)):
                 continue
-            if ('major' in collection_parts and 'planet_pop_large' not in system_tags):
-                continue
-            if ('minor' in collection_parts and 'planet_pop_medium' not in system_tags):
-                continue
+            # Skip all reward collections
             if ('Reward' in collection_parts):
                 continue
-            for part in system_parts:
-                if (part in collection_parts) or (part + 'Progression' in collection_parts):
+            # Only show "major" faction items on large population worlds
+            if ('major' in collection_parts and 'planet_pop_large' not in system_tags):
+                continue
+            # Only show "minor" faction items on medium population worlds
+            if ('minor' in collection_parts and 'planet_pop_medium' not in system_tags):
+                continue
+            # ISM doesn't have chemical tags; use agriculture as a stand in
+            if ('agriculture' in system_parts):
+                system_parts.append('chemicals')
+            if ('ruins' in system_parts):
+                system_parts.append('battlefield')
+            if ('industry' in system_parts and 'rich' in system_parts):
+                system_parts.append('industrial')
+            if ('industry' in system_parts and ('rich' in system_parts or 'poor' in system_parts)):
+                system_parts.append('electronics')
+            for part in list(set(system_parts)):
+                if ((part in collection_parts) or
+                    (part + 'Progression' in collection_parts)):
                 #if any(item in collection_parts for item in system_parts):
                     print(collection)
                     system_collections.append(collection)
+    system_collections.append('itemCollection_shop_progression_med')
+    system_collections=list(set(system_collections))
     return system_collections
         
 def export_StarSystem(filepath, sysdef):
@@ -114,7 +131,8 @@ with pushd(systems_3025):
                     print(get_system_tags(sysdef))
                     sysdef['SystemShopItems'] = []
                     shopsToAdd = get_system_collections(enumerate_itemCollections(VANILLA_ITEMCOLLECTION_DEFS),
-                                                        get_system_tags(sysdef))
+                                                        get_system_tags(sysdef),
+                                                        sysdef['Description']['Details'])
                     for item in  shopsToAdd:
                         sysdef['SystemShopItems'].append(item)
                     os.makedirs(os.path.join(SCRIPTDIR, "IS3025", "StarSystems"), exist_ok = True)
