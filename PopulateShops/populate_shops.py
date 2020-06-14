@@ -80,23 +80,30 @@ def get_system_collections(itemCollections, system_tags, system_desc, owner = No
             # Only show "minor" faction items on medium population worlds
             if ('minor' in collection_parts and 'planet_pop_medium' not in system_tags):
                 continue
-            # ISM doesn't have chemical tags; use agriculture as a stand in
-            if ('agriculture' in system_parts):
-                system_parts.append('chemicals')
-            if ('ruins' in system_parts):
-                system_parts.append('battlefield')
-            if ('industry' in system_parts and 'rich' in system_parts):
-                system_parts.append('industrial')
-            if ('industry' in system_parts and ('rich' in system_parts or 'poor' in system_parts)):
-                system_parts.append('electronics')
+
             for part in list(set(system_parts)):
                 if ((part in collection_parts) or
-                    (part + 'Progression' in collection_parts)):
-                #if any(item in collection_parts for item in system_parts):
-                    print(collection)
+                    (part + 'Progression' in collection_parts and 'planet_civ_innersphere' in system_tags)):
                     system_collections.append(collection)
-    system_collections.append('itemCollection_shop_progression_med')
+
+                # ISM doesn't have the following tags, so we use some stand ins
+                if ('agriculture' == part):
+                    part = "chemicals"
+                if ('aquaculture' == part):
+                    part = 'chemicals'
+                if ('ruins' == part):
+                    part = 'battlefield'
+                if ('innersphere' == part):
+                    part = 'electronics'
+                if ('manufacturing' == part and 'planet_industry_mining' in system_tags):
+                    part = 'industrial'
+                
+                if ((part in collection_parts) or
+                    (part + 'Progression' in collection_parts and 'planet_civ_innersphere' in system_tags)):
+                    system_collections.append(collection)
+                    
     system_collections=list(set(system_collections))
+    print(system_collections)
     return system_collections
         
 def export_StarSystem(filepath, sysdef):
