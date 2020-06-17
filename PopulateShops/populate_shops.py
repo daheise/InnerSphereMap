@@ -48,21 +48,55 @@ def get_system_tags(sysdef):
 
 def get_system_owner(sysdef):
     """Return an array of planet_* tags"""
-    return sysdef['Tags']['items']
+    return sysdef['ownerID']
 
-def get_system_collections(itemCollections, system_tags, system_desc, owner = None):
+def set_planet_faction_tag(sysdef):
+    owner = get_system_owner(sysdef)
+    # Fix some one-off exceptions
+    if owner == "TaurianConcordat":
+        owner = "taurian"
+    elif owner == "AuriganDirectorate":
+        owner = "directorate"
+    elif owner == "MagistracyOfCanopus":
+        owner = "magistracy"
+    elif owner == "AuriganRestoration":
+        owner = "restoration"
+    faction_tag = 'planet_faction_' + owner.lower()
+    sysdef['Tags']['items'].append(faction_tag)
+    return faction_tag
+
+def get_faction_shop_collections(itemCollections, sysdef):
+        owner = get_system_owner(sysdef)
+        system_tags = get_system_tags(sysdef)
+        #system_parts = system_tags.split('_')
+        faction_collections = []
+
+        if ('planet_industry_manufacturing' in system_tags and 'planet_industry_mining' in system_tags):
+            for collection in itemCollections:
+                collection_parts = list(set(collection.split('_')))
+                if owner in collection_parts and 'faction' in collection_parts:
+                    faction_collections.append(collection)
+        return faction_collections
+
+        
+
+def get_system_shop_collections(itemCollections, sysdef):
     """
     Determine appropriate shop item collections.
     
     This function errs to being very generous.
     """
+    system_tags = get_system_tags(sysdef)
+    system_desc = sysdef['Description']['Details']
+    owner = get_system_owner(sysdef)
     system_collections = []
+
     for system_tag in system_tags:
         # Split the item tags by underscore.
         system_parts = system_tag.split('_')
         # If a particular part is about 'none' then we don't care about it
-        if 'none' in system_parts:
-            continue
+        # if 'none' in system_parts:
+        #    continue
         for collection in itemCollections:
             # Split the item collection possibilities by underscore
             collection_parts = list(set(collection.split('_')))
@@ -82,6 +116,7 @@ def get_system_collections(itemCollections, system_tags, system_desc, owner = No
                 continue
 
             for part in list(set(system_parts)):
+                # Populate Regular Shops
                 if ((part in collection_parts) or
                     (part + 'Progression' in collection_parts and 'planet_civ_innersphere' in system_tags)):
                     system_collections.append(collection)
@@ -101,7 +136,10 @@ def get_system_collections(itemCollections, system_tags, system_desc, owner = No
                 if ((part in collection_parts) or
                     (part + 'Progression' in collection_parts and 'planet_civ_innersphere' in system_tags)):
                     system_collections.append(collection)
-                    
+    
+    if len(system_collections) == 0:
+        # Empty shops are depressing and most systems are abandoned.
+        system_collections.append('itemCollection_table_AdditionalLoot_common')
     system_collections=list(set(system_collections))
     print(system_collections)
     return system_collections
@@ -135,13 +173,17 @@ with pushd(systems_3025):
                 with io.open(filepath, "r", encoding='utf8') as sysjson:
                     sysdef = sysjson.read()
                     sysdef = json.loads(sysdef)
+                    set_planet_faction_tag(sysdef)
                     print(get_system_tags(sysdef))
-                    sysdef['SystemShopItems'] = []
-                    shopsToAdd = get_system_collections(enumerate_itemCollections(VANILLA_ITEMCOLLECTION_DEFS),
-                                                        get_system_tags(sysdef),
-                                                        sysdef['Description']['Details'])
-                    for item in  shopsToAdd:
-                        sysdef['SystemShopItems'].append(item)
+                    itemCollections = enumerate_itemCollections(VANILLA_ITEMCOLLECTION_DEFS)
+                    sysdef['SystemShopItems'] = get_system_shop_collections(itemCollections,
+                                                        sysdef)
+                    sysdef['FactionShopItems'] = get_faction_shop_collections(itemCollections,
+                                                                              sysdef)
+                    if len(sysdef['FactionShopItems']) == 0:
+                        sysdef['factionShopOwnerID'] = "INVALID_UNSET"
+                    else:
+                        sysdef['factionShopOwnerID'] = get_system_owner(sysdef)
                     os.makedirs(os.path.join(SCRIPTDIR, "IS3025", "StarSystems"), exist_ok = True)
                     export_StarSystem(os.path.join(SCRIPTDIR, "IS3025", "StarSystems", filename), sysdef)
                     #print(json.dumps(sysdef, sort_keys=True, indent=4))
